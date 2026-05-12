@@ -18,7 +18,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: devops1-api:latest
+    image: devops2-api:latest
     container_name: devops2-api
     depends_on:
       db:

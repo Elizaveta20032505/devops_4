@@ -15,7 +15,7 @@ pipeline {
 
     environment {
         DOCKERHUB_USER = "${env.DOCKERHUB_USER ?: 'YOUR_DOCKERHUB_LOGIN'}"
-        IMAGE = "${DOCKERHUB_USER}/devops1-api"
+        IMAGE = "${DOCKERHUB_USER}/devops2-api"
         SCENARIO_BASE_URL = "http://127.0.0.1:8000"
     }
 
@@ -39,7 +39,7 @@ pipeline {
                     bat 'echo %DH_PASS% | docker login -u %DH_USER% --password-stdin'
                 }
                 bat "docker pull ${IMAGE}:${params.IMAGE_TAG}"
-                bat "docker tag ${IMAGE}:${params.IMAGE_TAG} devops1-api:latest"
+                bat "docker tag ${IMAGE}:${params.IMAGE_TAG} devops2-api:latest"
             }
         }
 
