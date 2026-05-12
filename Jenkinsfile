@@ -13,7 +13,7 @@ pipeline {
 
     environment {
         DOCKERHUB_USER = "${env.DOCKERHUB_USER ?: 'YOUR_DOCKERHUB_LOGIN'}"
-        IMAGE = "${DOCKERHUB_USER}/devops1-api"
+        IMAGE = "${DOCKERHUB_USER}/devops2-api"
         TAG = "build-${env.BUILD_NUMBER}"
     }
 

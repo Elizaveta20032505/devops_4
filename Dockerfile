@@ -1,7 +1,7 @@
 FROM python:3.12-slim-bookworm
 
-LABEL org.opencontainers.image.title="devops1-breast-cancer-api"
-LABEL org.opencontainers.image.description="FastAPI + логрег"
+LABEL org.opencontainers.image.title="devops2-breast-cancer-api"
+LABEL org.opencontainers.image.description="FastAPI + логрег + PostgreSQL"
 
 WORKDIR /app
 
@@ -13,6 +13,7 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY config.ini .
 COPY src ./src
+COPY scripts ./scripts
 COPY experiments ./experiments
 
 EXPOSE 8000
