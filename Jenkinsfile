@@ -13,7 +13,7 @@ pipeline {
 
     environment {
         DOCKERHUB_USER = "${env.DOCKERHUB_USER ?: 'YOUR_DOCKERHUB_LOGIN'}"
-        IMAGE = "${DOCKERHUB_USER}/devops3-api"
+        IMAGE = "${DOCKERHUB_USER}/devops4-api"
         TAG = "build-${env.BUILD_NUMBER}"
     }
 
@@ -58,7 +58,7 @@ pipeline {
     post {
         success {
             script {
-                build job: 'devops3-model-cd',
+                build job: 'devops4-model-cd',
                       parameters: [string(name: 'IMAGE_TAG', value: "${env.TAG}")],
                       wait: false
             }

@@ -88,6 +88,15 @@ def main() -> int:
                 if got.get(k) != v:
                     print(f"[{sid}] FAIL json {k}: {got.get(k)!r} != {v!r}", file=sys.stderr)
                     return 1
+        if "expect_json_keys" in step:
+            got = json.loads(raw.decode("utf-8"))
+            if not isinstance(got, dict):
+                print(f"[{sid}] FAIL json not object: {got!r}", file=sys.stderr)
+                return 1
+            for k in step["expect_json_keys"]:
+                if k not in got:
+                    print(f"[{sid}] FAIL json missing key {k!r}", file=sys.stderr)
+                    return 1
         print(f"[{sid}] OK (HTTP {status})")
 
     print("Готово.")

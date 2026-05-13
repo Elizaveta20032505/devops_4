@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import logging
 import os
+import queue
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
+from src import kafka_bus
 from src.inference import load_artifacts, predict_from_features, read_feature_names_for_openapi
 
 logger = logging.getLogger("api")
@@ -47,10 +49,13 @@ async def _lifespan(app: FastAPI):
             app.state.db_ready = True
         except Exception as e:
             logger.warning("DB init failed, продолжаем без БД: %s", e)
+
+    kafka_bus.start_consumer_background()
     yield
+    kafka_bus.shutdown_kafka()
 
 
-app = FastAPI(title="breast-cancer-logreg", version="0.2", lifespan=_lifespan)
+app = FastAPI(title="breast-cancer-logreg", version="0.3", lifespan=_lifespan)
 
 
 @app.get("/health")
@@ -75,6 +80,11 @@ def predict(body: PredictBody) -> dict:
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
+    try:
+        kafka_bus.publish_prediction_result(result)
+    except Exception as e:
+        logger.warning("Kafka publish: %s", e)
+
     if getattr(app.state, "db_ready", False):
         try:
             from src.db import save_prediction
@@ -96,3 +106,22 @@ def predictions(limit: int = Query(10, ge=1, le=200)) -> dict:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"DB error: {e}") from e
     return {"items": items, "count": len(items)}
+
+
+@app.get("/kafka/last")
+def kafka_last(
+    timeout_sec: float = Query(15, ge=1, le=90),
+    drain: int = Query(0, ge=0, le=1),
+) -> dict:
+    """Ждёт следующее сообщение из очереди consumer (для сценариев после POST /predict)."""
+    if not kafka_bus.kafka_enabled():
+        raise HTTPException(status_code=503, detail="Kafka выключена (KAFKA_ENABLED=0).")
+    if drain:
+        kafka_bus.drain_message_queue()
+    try:
+        return kafka_bus.wait_next_message(timeout_sec)
+    except queue.Empty:
+        raise HTTPException(
+            status_code=408,
+            detail="Таймаут: сообщение из Kafka не получено.",
+        ) from None

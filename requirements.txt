@@ -9,3 +9,4 @@ httpx==0.28.1
 PyYAML==6.0.2
 dvc>=3.0,<4
 psycopg2-binary==2.9.10
+kafka-python==2.2.15

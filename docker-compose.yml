@@ -1,7 +1,7 @@
 services:
   vault:
     image: hashicorp/vault:1.17
-    container_name: devops3-vault
+    container_name: devops4-vault
     cap_add:
       - IPC_LOCK
     environment:
@@ -25,7 +25,8 @@ services:
           dbname=$$POSTGRES_DB \
           username=$$POSTGRES_USER \
           password=$$POSTGRES_PASSWORD
-        echo "Vault seeded: secret/postgres"
+        vault kv put secret/kafka bootstrap_servers=kafka:9092 topic=model_predictions
+        echo "Vault seeded: secret/postgres, secret/kafka"
         wait $$VAULT_PID
     ports:
       - "8200:8200"
@@ -36,9 +37,33 @@ services:
       retries: 30
       start_period: 5s
 
+  kafka:
+    image: docker.io/bitnami/kafka:3.7
+    container_name: devops4-kafka
+    environment:
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+      KAFKA_CFG_NODE_ID: "0"
+      KAFKA_CFG_PROCESS_ROLES: controller,broker
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/bitnami/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server 127.0.0.1:9092 || exit 1",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 18
+      start_period: 40s
+
   db:
     image: postgres:16-alpine
-    container_name: devops3-db
+    container_name: devops4-db
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -55,17 +80,21 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: devops3-api:latest
-    container_name: devops3-api
+    image: devops4-api:latest
+    container_name: devops4-api
     depends_on:
       db:
         condition: service_healthy
       vault:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     environment:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_TOKEN}
       VAULT_SECRET_PATH: secret/data/postgres
+      VAULT_KAFKA_SECRET_PATH: secret/data/kafka
+      KAFKA_ENABLED: "1"
     ports:
       - "8000:8000"
     healthcheck:

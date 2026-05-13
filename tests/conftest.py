@@ -18,6 +18,7 @@ def tiny_api_module(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     feats = ["radius_mean", "texture_mean", "smoothness_mean"]
     (tmp_path / "feature_names.json").write_text(json.dumps(feats), encoding="utf-8")
     monkeypatch.setenv("DEVOPS_MODEL_DIR", str(tmp_path))
+    monkeypatch.setenv("KAFKA_ENABLED", "0")
     import src.api as api_mod
 
     importlib.reload(api_mod)

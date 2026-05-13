@@ -1,7 +1,7 @@
 version: 1
 
 docker:
-  image_repository_tag: devops1-api:latest
+  image_repository_tag: devops4-api:latest
   image_digest: ""
   dockerfile: Dockerfile
 

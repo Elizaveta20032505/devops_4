@@ -1,6 +1,6 @@
 FROM python:3.12-slim-bookworm
 
-LABEL org.opencontainers.image.title="devops2-breast-cancer-api"
+LABEL org.opencontainers.image.title="devops4-breast-cancer-api"
 LABEL org.opencontainers.image.description="FastAPI + логрег + PostgreSQL"
 
 WORKDIR /app
