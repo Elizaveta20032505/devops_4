@@ -11,9 +11,9 @@ pipeline {
 
     environment {
         DOCKERHUB_USER = "${env.DOCKERHUB_USER ?: 'YOUR_DOCKERHUB_LOGIN'}"
-        IMAGE = "${DOCKERHUB_USER}/devops3-api"
+        IMAGE = "${DOCKERHUB_USER}/devops4-api"
         SCENARIO_BASE_URL = "http://127.0.0.1:8000"
-        POSTGRES_DB = "devops"
+        POSTGRES_DB = "devops4"
     }
 
     stages {
@@ -26,7 +26,7 @@ pipeline {
         stage('cleanup_before') {
             steps {
                 bat(returnStatus: true, script: 'docker compose --env-file secrets.env down -v')
-                bat(returnStatus: true, script: 'docker rm -f devops3-vault devops3-db devops3-api')
+                bat(returnStatus: true, script: 'docker rm -f devops4-vault devops4-db devops4-api devops4-kafka')
             }
         }
 
@@ -43,7 +43,7 @@ pipeline {
                     bat 'echo %DH_PASS% | docker login -u %DH_USER% --password-stdin'
                 }
                 bat "docker pull ${IMAGE}:${params.IMAGE_TAG}"
-                bat "docker tag ${IMAGE}:${params.IMAGE_TAG} devops3-api:latest"
+                bat "docker tag ${IMAGE}:${params.IMAGE_TAG} devops4-api:latest"
             }
         }
 
@@ -74,7 +74,7 @@ pipeline {
         stage('vault_check') {
             steps {
                 // metadata — без вывода пароля в лог Jenkins
-                bat 'docker exec devops3-vault vault kv metadata get -mount=secret postgres'
+                bat 'docker exec devops4-vault vault kv metadata get -mount=secret postgres'
             }
         }
 
@@ -105,7 +105,7 @@ pipeline {
             bat(returnStatus: true, script: 'docker logout')
         }
         failure {
-            echo 'Проверь: docker compose в PATH у агента, creds dockerhub-creds, pg-creds, vault-token-creds, свободные порты 8000/5432/8200.'
+            echo 'Проверь: docker compose в PATH у агента, creds dockerhub-creds, pg-creds, vault-token-creds, свободные порты 8000/5432/8200/9092.'
         }
     }
 }

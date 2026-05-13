@@ -20,8 +20,16 @@
       "method": "POST",
       "path": "/predict",
       "body_template": "zeros_from_feature_names",
-      "expect_status_in": [200, 503],
-      "comment": "200 если модель в образе; 503 если нет model.joblib."
+      "expect_status": 200,
+      "comment": "Нужна модель в образе; дальше проверка Kafka."
+    },
+    {
+      "id": "kafka_last",
+      "method": "GET",
+      "path": "/kafka/last?timeout_sec=30&drain=1",
+      "expect_status": 200,
+      "expect_json_keys": ["label", "malignant_probability"],
+      "comment": "Работает если Kafka включена и до этого был успешный POST /predict."
     },
     {
       "id": "predictions_list",
