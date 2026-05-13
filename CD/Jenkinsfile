@@ -25,7 +25,8 @@ pipeline {
 
         stage('cleanup_before') {
             steps {
-                bat(returnStatus: true, script: 'docker compose --env-file secrets.env down -v')
+                // secrets.env появляется только в compose_up; на чистом workspace compose ругался бы на отсутствие файла
+                bat(returnStatus: true, script: 'if exist secrets.env docker compose --env-file secrets.env down -v')
                 bat(returnStatus: true, script: 'docker rm -f devops4-vault devops4-db devops4-api devops4-kafka')
             }
         }
@@ -98,9 +99,9 @@ pipeline {
 
     post {
         always {
-            bat(returnStatus: true, script: 'docker compose --env-file secrets.env logs --no-color > compose-logs.txt 2>&1')
+            bat(returnStatus: true, script: 'if exist secrets.env docker compose --env-file secrets.env logs --no-color > compose-logs.txt 2>&1')
             archiveArtifacts artifacts: 'compose-logs.txt', allowEmptyArchive: true
-            bat(returnStatus: true, script: 'docker compose --env-file secrets.env down -v')
+            bat(returnStatus: true, script: 'if exist secrets.env docker compose --env-file secrets.env down -v')
             bat(returnStatus: true, script: 'if exist secrets.env del /f /q secrets.env')
             bat(returnStatus: true, script: 'docker logout')
         }
