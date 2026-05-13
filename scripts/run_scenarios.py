@@ -68,12 +68,17 @@ def main() -> int:
     scen = _load_json(scen_path)
     base = os.environ.get("SCENARIO_BASE_URL", scen.get("default_base_url", "http://127.0.0.1:8000")).rstrip("/")
 
+    predict_ok = False
+
     for step in scen.get("steps", []):
         sid = step.get("id", "?")
         method = step.get("method", "").upper()
         if not method:
             continue
         path = step.get("path", "/")
+        if step.get("skip_if_predict_failed") and not predict_ok:
+            print(f"[{sid}] skip: нет успешного POST /predict (модель не в образе).", file=sys.stderr)
+            continue
         url = base + path
         try:
             if method == "GET":
@@ -98,6 +103,9 @@ def main() -> int:
         except URLError as e:
             print(f"[{sid}] ошибка сети: {e}", file=sys.stderr)
             return 1
+
+        if sid == "predict_zeros" and method == "POST" and status == 200:
+            predict_ok = True
 
         allowed = step.get("expect_status_in")
         if allowed is not None:
