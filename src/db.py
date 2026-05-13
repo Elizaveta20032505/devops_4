@@ -1,15 +1,16 @@
-"""Подключение к PostgreSQL. Креды только из переменных окружения."""
+"""Подключение к PostgreSQL. Креды берутся ТОЛЬКО из HashiCorp Vault."""
 from __future__ import annotations
 
 import configparser
 import json
-import os
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
 import psycopg2
 from psycopg2.extensions import connection as PGConnection
+
+from src.secrets import fetch_secret
 
 
 def _root() -> Path:
@@ -30,17 +31,20 @@ def training_table() -> str:
     return _cfg()["DB"].get("training_table", "training_data")
 
 
+_REQUIRED_SECRET_KEYS = ("host", "dbname", "username", "password")
+
+
 def _conn_params() -> dict:
-    required = ("POSTGRES_HOST", "POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD")
-    missing = [k for k in required if not os.environ.get(k)]
+    secret = fetch_secret()
+    missing = [k for k in _REQUIRED_SECRET_KEYS if not secret.get(k)]
     if missing:
-        raise RuntimeError(f"Не заданы переменные окружения для БД: {missing}")
+        raise RuntimeError(f"В Vault отсутствуют ключи для подключения к БД: {missing}")
     return {
-        "host": os.environ["POSTGRES_HOST"],
-        "port": int(os.environ.get("POSTGRES_PORT", "5432")),
-        "dbname": os.environ["POSTGRES_DB"],
-        "user": os.environ["POSTGRES_USER"],
-        "password": os.environ["POSTGRES_PASSWORD"],
+        "host": secret["host"],
+        "port": int(secret.get("port", 5432)),
+        "dbname": secret["dbname"],
+        "user": secret["username"],
+        "password": secret["password"],
     }
 
 

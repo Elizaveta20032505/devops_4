@@ -1,7 +1,3 @@
-// CD (Windows): pull образа -> docker compose up (api+db) -> seed -> сценарии.
-// Creds: dockerhub-creds, pg-creds (usernamePassword: POSTGRES_USER / POSTGRES_PASSWORD).
-// Global ENV: DOCKERHUB_USER.
-
 pipeline {
     agent any
 
@@ -15,8 +11,9 @@ pipeline {
 
     environment {
         DOCKERHUB_USER = "${env.DOCKERHUB_USER ?: 'YOUR_DOCKERHUB_LOGIN'}"
-        IMAGE = "${DOCKERHUB_USER}/devops2-api"
+        IMAGE = "${DOCKERHUB_USER}/devops3-api"
         SCENARIO_BASE_URL = "http://127.0.0.1:8000"
+        POSTGRES_DB = "devops"
     }
 
     stages {
@@ -28,8 +25,8 @@ pipeline {
 
         stage('cleanup_before') {
             steps {
-                bat(returnStatus: true, script: 'docker compose down -v')
-                bat(returnStatus: true, script: 'docker rm -f devops2-db devops2-api')
+                bat(returnStatus: true, script: 'docker compose --env-file secrets.env down -v')
+                bat(returnStatus: true, script: 'docker rm -f devops3-vault devops3-db devops3-api')
             }
         }
 
@@ -46,7 +43,7 @@ pipeline {
                     bat 'echo %DH_PASS% | docker login -u %DH_USER% --password-stdin'
                 }
                 bat "docker pull ${IMAGE}:${params.IMAGE_TAG}"
-                bat "docker tag ${IMAGE}:${params.IMAGE_TAG} devops2-api:latest"
+                bat "docker tag ${IMAGE}:${params.IMAGE_TAG} devops3-api:latest"
             }
         }
 
@@ -57,22 +54,32 @@ pipeline {
                         credentialsId: 'pg-creds',
                         usernameVariable: 'POSTGRES_USER',
                         passwordVariable: 'POSTGRES_PASSWORD'
+                    ),
+                    string(
+                        credentialsId: 'vault-token-creds',
+                        variable: 'VAULT_TOKEN'
                     )
                 ]) {
                     bat '''
-                        (echo POSTGRES_DB=devops& echo POSTGRES_USER=%POSTGRES_USER%& echo POSTGRES_PASSWORD=%POSTGRES_PASSWORD%) > .env
-                        docker compose down -v
-                        docker compose up -d
+                        (echo VAULT_TOKEN=%VAULT_TOKEN%& echo POSTGRES_DB=%POSTGRES_DB%& echo POSTGRES_USER=%POSTGRES_USER%& echo POSTGRES_PASSWORD=%POSTGRES_PASSWORD%) > secrets.env
+                        docker compose --env-file secrets.env down -v
+                        docker compose --env-file secrets.env up -d
                     '''
-                    bat 'ping -n 26 127.0.0.1 > nul'
+                    bat 'ping -n 31 127.0.0.1 > nul'
                 }
+            }
+        }
+
+        stage('vault_check') {
+            steps {
+                bat 'docker exec devops3-vault vault kv get -mount=secret postgres'
             }
         }
 
         stage('seed_db') {
             steps {
                 script {
-                    def rc = bat(returnStatus: true, script: 'docker compose exec -T api python scripts/seed_db.py')
+                    def rc = bat(returnStatus: true, script: 'docker compose --env-file secrets.env exec -T api python scripts/seed_db.py')
                     if (rc != 0) {
                         echo "seed_db skipped (rc=${rc}) -- data/raw/data.csv нет в образе либо не подтянут DVC"
                     }
@@ -89,14 +96,14 @@ pipeline {
 
     post {
         always {
-            bat(returnStatus: true, script: 'docker compose logs --no-color > compose-logs.txt 2>&1')
+            bat(returnStatus: true, script: 'docker compose --env-file secrets.env logs --no-color > compose-logs.txt 2>&1')
             archiveArtifacts artifacts: 'compose-logs.txt', allowEmptyArchive: true
-            bat(returnStatus: true, script: 'docker compose down -v')
-            bat(returnStatus: true, script: 'if exist .env del /f /q .env')
+            bat(returnStatus: true, script: 'docker compose --env-file secrets.env down -v')
+            bat(returnStatus: true, script: 'if exist secrets.env del /f /q secrets.env')
             bat(returnStatus: true, script: 'docker logout')
         }
         failure {
-            echo 'Проверь: docker compose в PATH у агента, creds dockerhub-creds и pg-creds, свободные порты 8000/5432.'
+            echo 'Проверь: docker compose в PATH у агента, creds dockerhub-creds, pg-creds, vault-token-creds, свободные порты 8000/5432/8200.'
         }
     }
 }

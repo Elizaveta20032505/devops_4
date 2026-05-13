@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 venv/
 .env
+secrets.env
 .ipynb_checkpoints/
 *.egg-info/
 .coverage

@@ -1,7 +1,44 @@
 services:
+  vault:
+    image: hashicorp/vault:1.17
+    container_name: devops3-vault
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN}
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://127.0.0.1:8200
+      VAULT_TOKEN: ${VAULT_TOKEN}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        vault server -dev -dev-listen-address=0.0.0.0:8200 -dev-root-token-id="$$VAULT_TOKEN" &
+        VAULT_PID=$$!
+        until vault status >/dev/null 2>&1; do sleep 1; done
+        vault kv put secret/postgres \
+          host=db \
+          port=5432 \
+          dbname=$$POSTGRES_DB \
+          username=$$POSTGRES_USER \
+          password=$$POSTGRES_PASSWORD
+        echo "Vault seeded: secret/postgres"
+        wait $$VAULT_PID
+    ports:
+      - "8200:8200"
+    healthcheck:
+      test: ["CMD-SHELL", "VAULT_ADDR=http://127.0.0.1:8200 vault kv get -mount=secret postgres >/dev/null 2>&1"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
   db:
     image: postgres:16-alpine
-    container_name: devops2-db
+    container_name: devops3-db
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -18,17 +55,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: devops2-api:latest
-    container_name: devops2-api
+    image: devops3-api:latest
+    container_name: devops3-api
     depends_on:
       db:
         condition: service_healthy
+      vault:
+        condition: service_healthy
     environment:
-      POSTGRES_HOST: db
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_TOKEN}
+      VAULT_SECRET_PATH: secret/data/postgres
     ports:
       - "8000:8000"
     healthcheck:
